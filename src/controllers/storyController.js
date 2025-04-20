@@ -3,17 +3,31 @@ const Story = require("../models/Story");
 
 exports.getAllStories = async (req, res) => {
   try {
-    //  const stories = await Story.find().limit(1); // chỉ lấy 1 item kiểm tra
-    //  console.log("Kết quả từ MongoDB:", stories);
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
 
-    const total = await Story.countDocuments();
+    // Lấy filter theo name
+    const nameFilter = req.query.name
+      ? { name: { $regex: req.query.name, $options: "i" } }
+      : {};
+
+    // Lấy sort field và order
+    const sortField = req.query.sort || "name";
+    const sortOrder = req.query.order === "ASC" ? -1 : 1;
+
+    // Tổng số document
+    const total = await Story.countDocuments(nameFilter);
     const lastPage = Math.ceil(total / perPage);
     const skip = (page - 1) * perPage;
 
-    const stories = await Story.find().skip(skip).limit(perPage);
+    // Truy vấn MongoDB
+    const stories = await Story.find(nameFilter)
+      .skip(skip)
+      .limit(perPage)
+      .collation({ locale: "vi", strength: 1 })
+      .sort({ [sortField]: sortOrder });
 
+    // Trả về kết quả
     res.json({
       current_page: page,
       data: stories,
@@ -29,21 +43,24 @@ exports.getAllStories = async (req, res) => {
       total: total,
     });
   } catch (error) {
+    console.error("Lỗi backend:", error);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
+
 
 // exports.getAllStories = async (req, res) => {
 //   // res.json({message: "Hello from getAllStories"})
 //   res.send("Hello from getAllStories");
 // }
 
-exports.getStoryBySlug = async (req, res) => {
+exports.getStoryByID = async (req, res) => {
+  console.log("ID truyện:", req.params.id);
   try {
-    const story = await Story.findOne({ slug: req.params.slug });
-    if (!story)
+    const storyID = await Story.findOne({ id: req.params.id });
+    if (!storyID)
       return res.status(404).json({ message: "Không tìm thấy truyện" });
-    res.json(story);
+    res.json(storyID);
   } catch (error) {
     res.status(500).json({ message: "Lỗi server" });
   }
